@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Space Grotesk", "Segoe UI", sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #e6f0ff;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            inset: 0;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            background: rgba(0, 0, 0, 0.65);
+            padding: 16px 18px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            animation: float-in 0.6s ease-out both;
+        }
+
+        .ui-panel h3 {
+            color: #fff;
+            margin-bottom: 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .model-btn {
+            padding: 8px 14px;
+            background: transparent;
+            color: #e6f0ff;
+            border: 1px solid rgba(230, 240, 255, 0.3);
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: lowercase;
+            letter-spacing: 1px;
+            transition: all 0.25s ease;
+        }
+
+        .model-btn:hover {
+            border-color: rgba(94, 208, 255, 0.85);
+            color: #5ed0ff;
+        }
+
+        .model-btn.active {
+            background: rgba(94, 208, 255, 0.2);
+            border-color: #5ed0ff;
+            color: #5ed0ff;
+            font-weight: 600;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #5ed0ff;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            animation: float-in 0.7s ease-out both;
+        }
+
+        @keyframes float-in {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ui-panel">
+        <h3>Select Model</h3>
+        <div class="button-group">
+            <button class="model-btn active" data-model="giang">( giang )</button>
+            <button class="model-btn" data-model="jinny">( jinny )</button>
+            <button class="model-btn" data-model="lam">( lam )</button>
+            <button class="model-btn" data-model="nha">( nha )</button>
+            <button class="model-btn" data-model="nhan">( nhan )</button>
+            <button class="model-btn" data-model="phong">( phong )</button>
+        </div>
+    </div>
+
+    <div class="info">
+        Use mouse to orbit • Scroll to zoom • Right-click to pan
+    </div>
+
+    <!-- Core Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- GLTFLoader: Allows loading and displaying .gltf/.glb 3D model files -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- OrbitControls: Enables mouse/touch controls for rotating, panning, and zooming the camera -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- RGBELoader: Loads HDR environments for reflections/refraction -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+
+    <!-- Postprocessing -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/DotScreenPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/OutlinePass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/SSAOPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/SAOPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/LUTPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/SimplexNoise.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/DotScreenShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SSAOShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SAOShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/DepthLimitedBlurShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/UnpackDepthRGBAShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SobelOperatorShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/VignetteShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/RGBShiftShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/VignetteShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/RGBShiftShader.js"></script>
+
+    <!-- lil-gui: UI controls -->
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/dist/lil-gui.min.js"></script>
+
+    <!-- Custom script to set up the scene, load the model, and render it -->
+    <script src="script.js"></script>
+</body>
+</html>
