@@ -113,7 +113,7 @@ const CONFIG = {
   },
   environment: {
     enabled: true,
-    hdrPath: "assets/studio.hdr", // swap HDR for different reflection/refraction
+    hdrPath: "assets/hdr.skysunrise.hdr", // swap HDR for different reflection/refraction
     background: false,
     backgroundColor: 0x000000,
   },
@@ -202,6 +202,17 @@ const MODEL_TEXTURES = {
   nhan: "assets/loc.nhan.png",
   phong: "assets/loc.phong.png",
 };
+
+const HDR_OPTIONS = [
+  "assets/hdr.skysunrise.hdr",
+  "assets/hdr.skyday.hdr",
+  "assets/hdr.skymoon.hdr",
+  "assets/hdr.skymoonrise.hdr",
+  "assets/hdr.hill.hdr",
+  "assets/hdr.spring.hdr",
+  "assets/hdr.studioS.hdr",
+  "assets/hdr.studioK.hdr",
+];
 
 const INITIAL_MODEL = "giang";
 
@@ -1631,6 +1642,17 @@ function setupGui() {
     .onChange(applyRendererSettings);
 
   const environmentFolder = gui.addFolder("Environment");
+  const hdrOptions = {};
+  HDR_OPTIONS.forEach((path) => {
+    const name = path.replace("assets/", "").replace(".hdr", "");
+    hdrOptions[name] = path;
+  });
+  environmentFolder
+    .add(CONFIG.environment, "hdrPath", hdrOptions)
+    .name("HDR")
+    .onChange(() => {
+      if (CONFIG.environment.enabled) loadEnvironment();
+    });
   environmentFolder.add(CONFIG.environment, "enabled").onChange(() => {
     if (CONFIG.environment.enabled && !environmentMap) {
       loadEnvironment();
@@ -2165,6 +2187,15 @@ function setupFallbackGui() {
   );
 
   addSection("Environment");
+  const hdrOptions = {};
+  HDR_OPTIONS.forEach((path) => {
+    const name = path.replace("assets/", "").replace(".hdr", "");
+    hdrOptions[name] = path;
+  });
+  addSelect("HDR", hdrOptions, CONFIG.environment.hdrPath, (value) => {
+    CONFIG.environment.hdrPath = value;
+    if (CONFIG.environment.enabled) loadEnvironment();
+  });
   addCheckbox("Enable HDR", CONFIG.environment, "enabled", () => {
     if (CONFIG.environment.enabled && !environmentMap) loadEnvironment();
     applyEnvironmentSettings();
