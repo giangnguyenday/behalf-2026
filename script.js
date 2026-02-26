@@ -225,6 +225,7 @@ const CONFIG = {
 const MODEL_TEXTURES = {
   giang: "assets/loc.giang.png",
   jinny: "assets/loc.jinny.png",
+  banglam: "assets/loc.banglam.png",
   lam: "assets/loc.lam.png",
   nha: "assets/loc.nha.png",
   nhan: "assets/loc.nhan.png",
