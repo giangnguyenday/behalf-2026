@@ -1,6 +1,31 @@
+const BACKGROUND_PALETTE = {
+  Black: "#000000",
+  White: "#ffffff",
+  "Primary Blue": "#a4bddd",
+  "Primary Red": "#d50b0b",
+  "Primary Yellow": "#ffff90",
+  "Primary Orange": "#ff5622",
+  "Primary Neon Pink": "#ff6ffa",
+  "Primary Pink": "#ff9bd7",
+  "Primary Neon Blue": "#60e6ff",
+  "Primary Dark Green": "#40401a",
+};
+const BACKGROUND_PALETTE_VALUES = Object.values(BACKGROUND_PALETTE).map((value) =>
+  value.toLowerCase(),
+);
+const BACKGROUND_TYPE_OPTIONS = {
+  Solid: "solid",
+  Gradient: "gradient",
+};
+const BACKGROUND_TYPE_VALUES = Object.values(BACKGROUND_TYPE_OPTIONS);
+
+let gradientTexture = null;
+let gradientCanvas = null;
+let gradientContext = null;
+let lastGradientKey = "";
+
 // Config
 const CONFIG = {
-  backgroundColor: 0x000000,
   camera: { fov: 45, near: 0.1, far: 5000 },
   renderer: {
     antialias: true,
@@ -115,7 +140,10 @@ const CONFIG = {
     enabled: true,
     hdrPath: "assets/hdr.skysunrise.hdr", // swap HDR for different reflection/refraction
     background: false,
-    backgroundColor: 0x000000,
+    backgroundType: BACKGROUND_TYPE_OPTIONS.Solid,
+    backgroundColor: BACKGROUND_PALETTE.Black,
+    backgroundGradientTop: BACKGROUND_PALETTE.Black,
+    backgroundGradientBottom: BACKGROUND_PALETTE["Primary Blue"],
   },
   postprocessing: {
     enabled: true,
@@ -218,7 +246,7 @@ const INITIAL_MODEL = "giang";
 
 // Scene
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(CONFIG.backgroundColor);
+scene.background = new THREE.Color(CONFIG.environment.backgroundColor);
 
 const camera = new THREE.PerspectiveCamera(
   CONFIG.camera.fov,
@@ -281,14 +309,87 @@ function loadEnvironment() {
     );
 }
 
+function normalizePaletteColor(value, fallback) {
+  const normalized = hexToCss(value).toLowerCase();
+  if (BACKGROUND_PALETTE_VALUES.includes(normalized)) return normalized;
+  return fallback;
+}
+
+function normalizeBackgroundSettings() {
+  if (!BACKGROUND_TYPE_VALUES.includes(CONFIG.environment.backgroundType)) {
+    CONFIG.environment.backgroundType = "solid";
+  }
+  CONFIG.environment.backgroundColor = normalizePaletteColor(
+    CONFIG.environment.backgroundColor,
+    BACKGROUND_PALETTE.Black,
+  );
+  CONFIG.environment.backgroundGradientTop = normalizePaletteColor(
+    CONFIG.environment.backgroundGradientTop,
+    BACKGROUND_PALETTE.Black,
+  );
+  CONFIG.environment.backgroundGradientBottom = normalizePaletteColor(
+    CONFIG.environment.backgroundGradientBottom,
+    BACKGROUND_PALETTE.Black,
+  );
+}
+
+function getGradientTexture(topColor, bottomColor) {
+  const top = normalizePaletteColor(topColor, BACKGROUND_PALETTE.Black);
+  const bottom = normalizePaletteColor(bottomColor, BACKGROUND_PALETTE.Black);
+  const key = `${top}-${bottom}`;
+
+  if (!gradientCanvas) {
+    gradientCanvas = document.createElement("canvas");
+    gradientCanvas.width = 2;
+    gradientCanvas.height = 256;
+    gradientContext = gradientCanvas.getContext("2d");
+  }
+
+  if (!gradientTexture) {
+    gradientTexture = new THREE.CanvasTexture(gradientCanvas);
+    gradientTexture.encoding = THREE.sRGBEncoding;
+    gradientTexture.flipY = false;
+    gradientTexture.minFilter = THREE.LinearFilter;
+    gradientTexture.magFilter = THREE.LinearFilter;
+    gradientTexture.generateMipmaps = false;
+  }
+
+  if (key !== lastGradientKey && gradientContext) {
+    const gradient = gradientContext.createLinearGradient(
+      0,
+      0,
+      0,
+      gradientCanvas.height,
+    );
+    // Swap stops to ensure top color renders at the top of the viewport.
+    gradient.addColorStop(0, bottom);
+    gradient.addColorStop(1, top);
+    gradientContext.fillStyle = gradient;
+    gradientContext.fillRect(0, 0, gradientCanvas.width, gradientCanvas.height);
+    gradientTexture.needsUpdate = true;
+    lastGradientKey = key;
+  }
+
+  return gradientTexture;
+}
+
 function applyEnvironmentSettings() {
+  normalizeBackgroundSettings();
   const hasEnv = CONFIG.environment.enabled && environmentMap;
   scene.environment = hasEnv ? environmentMap : null;
 
   if (CONFIG.environment.background && environmentMap) {
     scene.background = environmentMap;
   } else {
-    scene.background = new THREE.Color(CONFIG.environment.backgroundColor);
+    const isGradient = CONFIG.environment.backgroundType === "gradient";
+    if (isGradient) {
+      scene.background = getGradientTexture(
+        CONFIG.environment.backgroundGradientTop,
+        CONFIG.environment.backgroundGradientBottom,
+      );
+    } else {
+      scene.background = new THREE.Color(CONFIG.environment.backgroundColor);
+    }
   }
 }
 
@@ -1043,6 +1144,9 @@ const SETTINGS_TEMPLATE = {
     enabled: true,
     background: true,
     backgroundColor: true,
+    backgroundType: true,
+    backgroundGradientTop: true,
+    backgroundGradientBottom: true,
     hdrPath: true,
   },
   postprocessing: {
@@ -1663,11 +1767,40 @@ function setupGui() {
   environmentFolder.add(CONFIG.environment, "background").onChange(() => {
     applyEnvironmentSettings();
   });
-  environmentFolder
-    .addColor(CONFIG.environment, "backgroundColor")
-    .onChange(() => {
-      applyEnvironmentSettings();
-    });
+  const backgroundTypeController = environmentFolder
+    .add(CONFIG.environment, "backgroundType", BACKGROUND_TYPE_OPTIONS)
+    .name("Background Type");
+  const solidColorController = environmentFolder
+    .add(CONFIG.environment, "backgroundColor", BACKGROUND_PALETTE)
+    .name("Solid Color");
+  const gradientTopController = environmentFolder
+    .add(CONFIG.environment, "backgroundGradientTop", BACKGROUND_PALETTE)
+    .name("Gradient Top");
+  const gradientBottomController = environmentFolder
+    .add(CONFIG.environment, "backgroundGradientBottom", BACKGROUND_PALETTE)
+    .name("Gradient Bottom");
+
+  const updateBackgroundControllers = () => {
+    const isGradient = CONFIG.environment.backgroundType === "gradient";
+    solidColorController.domElement.style.display = isGradient ? "none" : "";
+    gradientTopController.domElement.style.display = isGradient ? "" : "none";
+    gradientBottomController.domElement.style.display = isGradient ? "" : "none";
+  };
+
+  backgroundTypeController.onChange(() => {
+    applyEnvironmentSettings();
+    updateBackgroundControllers();
+  });
+  solidColorController.onChange(() => {
+    applyEnvironmentSettings();
+  });
+  gradientTopController.onChange(() => {
+    applyEnvironmentSettings();
+  });
+  gradientBottomController.onChange(() => {
+    applyEnvironmentSettings();
+  });
+  updateBackgroundControllers();
   const environmentActions = {
     reloadHDR: () => {
       if (environmentMap) {
@@ -2071,6 +2204,7 @@ function setupFallbackGui() {
     row.appendChild(text);
     row.appendChild(input);
     panel.appendChild(row);
+    return row;
   };
 
   const addCheckbox = (label, obj, key, onChange) => {
@@ -2140,7 +2274,7 @@ function setupFallbackGui() {
     select.addEventListener("change", () => {
       onChange?.(select.value);
     });
-    addRow(label, select);
+    return addRow(label, select);
   };
 
   const addVector3 = (label, arrayRef, min, max, step, onChange) => {
@@ -2204,9 +2338,50 @@ function setupFallbackGui() {
   addCheckbox("Use HDR Background", CONFIG.environment, "background", () =>
     applyEnvironmentSettings(),
   );
-  addColor("Background Color", CONFIG.environment, "backgroundColor", () =>
-    applyEnvironmentSettings(),
+  const backgroundTypeRow = addSelect(
+    "Background Type",
+    BACKGROUND_TYPE_OPTIONS,
+    CONFIG.environment.backgroundType,
+    (value) => {
+      CONFIG.environment.backgroundType = value;
+      applyEnvironmentSettings();
+      updateBackgroundRows();
+    },
   );
+  const solidColorRow = addSelect(
+    "Solid Color",
+    BACKGROUND_PALETTE,
+    CONFIG.environment.backgroundColor,
+    (value) => {
+      CONFIG.environment.backgroundColor = value;
+      applyEnvironmentSettings();
+    },
+  );
+  const gradientTopRow = addSelect(
+    "Gradient Top",
+    BACKGROUND_PALETTE,
+    CONFIG.environment.backgroundGradientTop,
+    (value) => {
+      CONFIG.environment.backgroundGradientTop = value;
+      applyEnvironmentSettings();
+    },
+  );
+  const gradientBottomRow = addSelect(
+    "Gradient Bottom",
+    BACKGROUND_PALETTE,
+    CONFIG.environment.backgroundGradientBottom,
+    (value) => {
+      CONFIG.environment.backgroundGradientBottom = value;
+      applyEnvironmentSettings();
+    },
+  );
+  const updateBackgroundRows = () => {
+    const isGradient = CONFIG.environment.backgroundType === "gradient";
+    solidColorRow.style.display = isGradient ? "none" : "";
+    gradientTopRow.style.display = isGradient ? "" : "none";
+    gradientBottomRow.style.display = isGradient ? "" : "none";
+  };
+  updateBackgroundRows();
   addButton("Reload HDR", () => {
     if (environmentMap) {
       environmentMap.dispose();
